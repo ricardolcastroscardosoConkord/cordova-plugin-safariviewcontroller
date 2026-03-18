@@ -1,9 +1,10 @@
 package com.outsystems.safariviewcontroller;
 
+import android.content.Intent;
 import android.net.Uri;
 
-import androidx.browser.customtabs.CustomTabsClient;
 import androidx.browser.customtabs.CustomTabsIntent;
+import androidx.browser.customtabs.CustomTabsClient;
 import androidx.browser.customtabs.CustomTabsServiceConnection;
 import androidx.browser.customtabs.CustomTabsSession;
 
@@ -53,27 +54,53 @@ public class SafariViewController extends CordovaPlugin {
 
     private void show(JSONArray args, CallbackContext callbackContext) {
         try {
-            JSONObject options = args.optJSONObject(0);
-            String url = options != null ? options.optString("url", null) : null;
+            JSONObject options = args != null ? args.optJSONObject(0) : null;
+            String url = null;
+
+            if (options != null) {
+                url = options.optString("url", null);
+            }
 
             if (url == null || url.trim().isEmpty()) {
                 callbackContext.error("Missing url");
                 return;
             }
 
-            CustomTabsIntent.Builder builder = customTabsSession != null
-                    ? new CustomTabsIntent.Builder(customTabsSession)
-                    : new CustomTabsIntent.Builder();
+            final String finalUrl = url.trim();
+            final Uri uri = Uri.parse(finalUrl);
 
-            CustomTabsIntent intent = builder.build();
-            intent.intent.setData(Uri.parse(url));
-            cordova.getActivity().runOnUiThread(() ->
-                    intent.launchUrl(cordova.getActivity(), Uri.parse(url))
-            );
+            cordova.getActivity().runOnUiThread(() -> {
+                try {
+                    CustomTabsIntent.Builder builder =
+                            customTabsSession != null
+                                    ? new CustomTabsIntent.Builder(customTabsSession)
+                                    : new CustomTabsIntent.Builder();
 
-            callbackContext.success();
+                    builder.setShowTitle(true);
+
+                    CustomTabsIntent customTabsIntent = builder.build();
+                    customTabsIntent.intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+
+                    try {
+                        customTabsIntent.launchUrl(cordova.getActivity(), uri);
+                        callbackContext.success();
+                    } catch (Exception customTabsError) {
+                        try {
+                            Intent fallbackIntent = new Intent(Intent.ACTION_VIEW, uri);
+                            fallbackIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            cordova.getActivity().startActivity(fallbackIntent);
+                            callbackContext.success();
+                        } catch (Exception fallbackError) {
+                            callbackContext.error("Could not open url: " + fallbackError.getMessage());
+                        }
+                    }
+                } catch (Exception e) {
+                    callbackContext.error("Show failed: " + e.getMessage());
+                }
+            });
+
         } catch (Exception e) {
-            callbackContext.error(e.getMessage());
+            callbackContext.error("Show failed: " + e.getMessage());
         }
     }
 
@@ -85,8 +112,8 @@ public class SafariViewController extends CordovaPlugin {
             }
 
             String packageName = CustomTabsClient.getPackageName(cordova.getContext(), null);
-            if (packageName == null) {
-                callbackContext.error("No Custom Tabs provider found");
+            if (packageName == null || packageName.trim().isEmpty()) {
+                callbackContext.success();
                 return;
             }
 
@@ -94,8 +121,11 @@ public class SafariViewController extends CordovaPlugin {
                 @Override
                 public void onCustomTabsServiceConnected(android.content.ComponentName name, CustomTabsClient client) {
                     customTabsClient = client;
-                    customTabsClient.warmup(0L);
-                    customTabsSession = customTabsClient.newSession(null);
+                    try {
+                        customTabsClient.warmup(0L);
+                        customTabsSession = customTabsClient.newSession(null);
+                    } catch (Exception ignored) {
+                    }
                 }
 
                 @Override
@@ -108,9 +138,10 @@ public class SafariViewController extends CordovaPlugin {
 
             boolean ok = CustomTabsClient.bindCustomTabsService(cordova.getContext(), packageName, connection);
             if (ok) callbackContext.success();
-            else callbackContext.error("Could not bind Custom Tabs service");
+            else callbackContext.success();
+
         } catch (Exception e) {
-            callbackContext.error(e.getMessage());
+            callbackContext.success();
         }
     }
 
@@ -121,27 +152,22 @@ public class SafariViewController extends CordovaPlugin {
             }
             callbackContext.success();
         } catch (Exception e) {
-            callbackContext.error(e.getMessage());
+            callbackContext.success();
         }
     }
 
     private void mayLaunchUrl(JSONArray args, CallbackContext callbackContext) {
         try {
-            JSONObject options = args.optJSONObject(0);
+            JSONObject options = args != null ? args.optJSONObject(0) : null;
             String url = options != null ? options.optString("url", null) : null;
 
-            if (url == null || url.trim().isEmpty()) {
-                callbackContext.error("Missing url");
-                return;
-            }
-
-            if (customTabsSession != null) {
-                customTabsSession.mayLaunchUrl(Uri.parse(url), null, null);
+            if (url != null && !url.trim().isEmpty() && customTabsSession != null) {
+                customTabsSession.mayLaunchUrl(Uri.parse(url.trim()), null, null);
             }
 
             callbackContext.success();
         } catch (Exception e) {
-            callbackContext.error(e.getMessage());
+            callbackContext.success();
         }
     }
 }
