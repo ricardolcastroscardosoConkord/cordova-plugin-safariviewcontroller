@@ -5,10 +5,11 @@ import SafariServices
 class SafariViewController: CDVPlugin, SFSafariViewControllerDelegate {
 
     var safariVC: SFSafariViewController?
+    var currentCallbackId: String?
 
     @objc(isAvailable:)
     func isAvailable(command: CDVInvokedUrlCommand) {
-        let result = CDVPluginResult(status: CDVCommandStatus_OK)
+        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: true)
         self.commandDelegate.send(result, callbackId: command.callbackId)
     }
 
@@ -22,13 +23,17 @@ class SafariViewController: CDVPlugin, SFSafariViewControllerDelegate {
             return
         }
 
+        self.currentCallbackId = command.callbackId
+
         DispatchQueue.main.async {
+            self.sendEvent(callbackId: command.callbackId, event: "opened", keep: true)
+
             let vc = SFSafariViewController(url: url)
             vc.delegate = self
             self.safariVC = vc
+
             self.viewController.present(vc, animated: true) {
-                let result = CDVPluginResult(status: CDVCommandStatus_OK)
-                self.commandDelegate.send(result, callbackId: command.callbackId)
+                self.sendEvent(callbackId: command.callbackId, event: "loaded", keep: true)
             }
         }
     }
@@ -39,12 +44,10 @@ class SafariViewController: CDVPlugin, SFSafariViewControllerDelegate {
             if let vc = self.safariVC {
                 vc.dismiss(animated: true) {
                     self.safariVC = nil
-                    let result = CDVPluginResult(status: CDVCommandStatus_OK)
-                    self.commandDelegate.send(result, callbackId: command.callbackId)
+                    self.sendEvent(callbackId: command.callbackId, event: "closed", keep: false)
                 }
             } else {
-                let result = CDVPluginResult(status: CDVCommandStatus_OK)
-                self.commandDelegate.send(result, callbackId: command.callbackId)
+                self.sendEvent(callbackId: command.callbackId, event: "closed", keep: false)
             }
         }
     }
@@ -69,5 +72,17 @@ class SafariViewController: CDVPlugin, SFSafariViewControllerDelegate {
 
     func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
         self.safariVC = nil
+
+        if let callbackId = self.currentCallbackId {
+            self.sendEvent(callbackId: callbackId, event: "closed", keep: false)
+            self.currentCallbackId = nil
+        }
+    }
+
+    private func sendEvent(callbackId: String, event: String, keep: Bool) {
+        let payload: [String: Any] = ["event": event]
+        let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: payload)
+        result?.setKeepCallbackAs(keep)
+        self.commandDelegate.send(result, callbackId: callbackId)
     }
 }
