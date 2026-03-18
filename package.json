@@ -1,0 +1,20 @@
+{
+  "name": "cordova-plugin-safariviewcontroller",
+  "version": "1.0.0",
+  "description": "SafariViewController / Custom Tabs plugin for Cordova",
+  "cordova": {
+    "id": "cordova-plugin-safariviewcontroller",
+    "platforms": [
+      "android",
+      "ios"
+    ]
+  },
+  "keywords": [
+    "cordova",
+    "safari",
+    "safariviewcontroller",
+    "customtabs",
+    "browser"
+  ],
+  "license": "MIT"
+}
