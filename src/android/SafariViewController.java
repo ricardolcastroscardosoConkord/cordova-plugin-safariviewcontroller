@@ -3,13 +3,14 @@ package com.outsystems.safariviewcontroller;
 import android.content.Intent;
 import android.net.Uri;
 
-import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.browser.customtabs.CustomTabsClient;
+import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.browser.customtabs.CustomTabsServiceConnection;
 import androidx.browser.customtabs.CustomTabsSession;
 
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaPlugin;
+import org.apache.cordova.PluginResult;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -24,7 +25,7 @@ public class SafariViewController extends CordovaPlugin {
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
         switch (action) {
             case "isAvailable":
-                callbackContext.success();
+                callbackContext.success(1);
                 return true;
 
             case "show":
@@ -32,7 +33,7 @@ public class SafariViewController extends CordovaPlugin {
                 return true;
 
             case "hide":
-                callbackContext.success();
+                hide(callbackContext);
                 return true;
 
             case "connectToService":
@@ -55,22 +56,19 @@ public class SafariViewController extends CordovaPlugin {
     private void show(JSONArray args, CallbackContext callbackContext) {
         try {
             JSONObject options = args != null ? args.optJSONObject(0) : null;
-            String url = null;
-
-            if (options != null) {
-                url = options.optString("url", null);
-            }
+            String url = options != null ? options.optString("url", null) : null;
 
             if (url == null || url.trim().isEmpty()) {
                 callbackContext.error("Missing url");
                 return;
             }
 
-            final String finalUrl = url.trim();
-            final Uri uri = Uri.parse(finalUrl);
+            final Uri uri = Uri.parse(url.trim());
 
             cordova.getActivity().runOnUiThread(() -> {
                 try {
+                    sendEvent(callbackContext, "opened");
+
                     CustomTabsIntent.Builder builder =
                             customTabsSession != null
                                     ? new CustomTabsIntent.Builder(customTabsSession)
@@ -83,13 +81,13 @@ public class SafariViewController extends CordovaPlugin {
 
                     try {
                         customTabsIntent.launchUrl(cordova.getActivity(), uri);
-                        callbackContext.success();
+                        sendEvent(callbackContext, "loaded");
                     } catch (Exception customTabsError) {
                         try {
                             Intent fallbackIntent = new Intent(Intent.ACTION_VIEW, uri);
                             fallbackIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                             cordova.getActivity().startActivity(fallbackIntent);
-                            callbackContext.success();
+                            sendEvent(callbackContext, "loaded");
                         } catch (Exception fallbackError) {
                             callbackContext.error("Could not open url: " + fallbackError.getMessage());
                         }
@@ -101,6 +99,19 @@ public class SafariViewController extends CordovaPlugin {
 
         } catch (Exception e) {
             callbackContext.error("Show failed: " + e.getMessage());
+        }
+    }
+
+    private void hide(CallbackContext callbackContext) {
+        try {
+            JSONObject result = new JSONObject();
+            result.put("event", "closed");
+
+            PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, result);
+            pluginResult.setKeepCallback(false);
+            callbackContext.sendPluginResult(pluginResult);
+        } catch (Exception e) {
+            callbackContext.success();
         }
     }
 
@@ -137,9 +148,11 @@ public class SafariViewController extends CordovaPlugin {
             };
 
             boolean ok = CustomTabsClient.bindCustomTabsService(cordova.getContext(), packageName, connection);
-            if (ok) callbackContext.success();
-            else callbackContext.success();
-
+            if (ok) {
+                callbackContext.success();
+            } else {
+                callbackContext.success();
+            }
         } catch (Exception e) {
             callbackContext.success();
         }
@@ -169,5 +182,14 @@ public class SafariViewController extends CordovaPlugin {
         } catch (Exception e) {
             callbackContext.success();
         }
+    }
+
+    private void sendEvent(CallbackContext callbackContext, String eventName) throws JSONException {
+        JSONObject result = new JSONObject();
+        result.put("event", eventName);
+
+        PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, result);
+        pluginResult.setKeepCallback(true);
+        callbackContext.sendPluginResult(pluginResult);
     }
 }
