@@ -23,15 +23,16 @@
     </platform>
 
     <platform name="ios">
-        <config-file target="config.xml" parent="/*">
-            <feature name="SafariViewController">
-                <param name="ios-package" value="SafariViewController" />
-            </feature>
-        </config-file>
-
-        <preference name="UseSwiftLanguageVersion" default="5" />
-
-        <source-file src="src/ios/SafariViewController.swift" />
-        <framework src="SafariServices.framework" />
+            <config-file target="config.xml" parent="/*">
+                <feature name="SafariViewController">
+                    <param name="ios-package" value="SafariViewController" />
+                </feature>
+            </config-file>
+        
+            <preference name="UseSwiftLanguageVersion" default="5" />
+        
+            <source-file src="src/ios/SafariViewController.swift" />
+            <framework src="SafariServices.framework" />
+            <framework src="AuthenticationServices.framework" />
     </platform>
 </plugin>
